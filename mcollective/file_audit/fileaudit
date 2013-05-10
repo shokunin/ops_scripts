@@ -1,0 +1,67 @@
+#!/usr/bin/env ruby1.8
+require 'rubygems' if RUBY_VERSION < "1.9"
+require 'mcollective'
+require 'pp'
+ 
+include MCollective::RPC
+ 
+args = {}
+my_verbose = 0
+action="audit"
+errors=[]
+audit={}
+ 
+options = rpcoptions do |parser, options|
+ 
+  parser.on('-F', '--file file', 'file to audit') do |v|
+    args[:filename] = v
+    end 
+ 
+  parser.on('-K', '--action action', 'audit or role_call') do |v|
+    action = v
+    end 
+ 
+  parser.on('-V', '--verbose-errors') do |v|
+    my_verbose = 1
+  end
+ 
+end
+ 
+mc = rpcclient("fileaudit", :options => options)
+mc.timeout = 10
+mc.progress = false
+ 
+mc.send(action, args).each do |resp|
+
+  if resp[:statuscode] == 0
+    if audit.has_key? resp[:data][:output]
+      audit[resp[:data][:output]] << resp[:sender]
+    else
+      audit[resp[:data][:output]] = [resp[:sender]]
+    end
+  else
+    errors << resp
+  end
+end
+
+
+puts "===================== RESULTS ====================="
+puts args[:filename]
+puts "==================================================="
+
+audit.each do |k, v|
+  puts "#{k}    (#{v.length})"
+  puts "\t#{v.join','}"
+  puts "==================================================="
+end
+
+if errors.length > 0
+  puts "Errors: Run with -V to see them in detail"
+  if my_verbose > 0
+    puts "===================== ERRORS ====================="
+    errors.each { |x| pp x }
+  end
+end
+
+
+printrpcstats
