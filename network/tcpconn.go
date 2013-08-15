@@ -10,11 +10,13 @@ import (
 
 var hostname string
 var port int
+var timeout int
 var verbose bool
 
 func init() {
 	flag.StringVar(&hostname, "hostname", "localhost", "hostname or ip to scan")
 	flag.IntVar(&port, "port", 22, "port to try to connect to")
+	flag.IntVar(&timeout, "timeout", 22, "number of seconds to wait for connection")
 	flag.BoolVar(&verbose, "verbose", false,  "port to try to connect to")
 	flag.Parse()
 }
@@ -40,7 +42,7 @@ func main() {
 	}()
 	//##################################################################################
 	go func() {
-		time.Sleep(2 * time.Second)
+		time.Sleep(time.Duration(timeout) * time.Second)
 		c1 <- false
 	}()
 	//##################################################################################
