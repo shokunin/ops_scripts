@@ -5,6 +5,7 @@ import (
 	"github.com/bradfitz/gomemcache/memcache"
 	"fmt"
 	"os"
+	"io"
 	"time"
 )
 
@@ -30,7 +31,8 @@ func main() {
 			mc.Set(&memcache.Item{Key: "dtm-not-real", Value: []byte("setByNagios")})
 			conn, err := mc.Get("dtm-not-real")
 			if err != nil {
-				fmt.Println(fmt.Sprintf("CRITICAL: %s", err))
+				io.WriteString(os.Stdout, (fmt.Sprintf("CRITICAL: %s\n", err)))
+				os.Stdout.Sync()
 				c1 <- false
 			}
 			if conn != nil {
@@ -52,7 +54,8 @@ func main() {
 			select {
 				case msg1 := <- c1:
 					if msg1 {
-							fmt.Println("OK: able to create and fetch a record")
+						io.WriteString(os.Stdout, "OK: able to create and fetch a record\n")
+						os.Stdout.Sync()
 						os.Exit(0)
 					} else {
 						os.Exit(2)
