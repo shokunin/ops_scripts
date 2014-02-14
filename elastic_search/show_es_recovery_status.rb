@@ -35,8 +35,13 @@ puts "#######################################################################"
 status = return_info("/_status")
 status['indices'].each do |index, info|
   info['shards'].each do |shard, vals|
+    vals.each do |v|
+      if v['routing']['state'] == "RELOCATING"
+        puts "RELOCATING: Index: #{v['routing']['index']} Shard: #{v['routing']['shard']} from #{nodes['nodes'][v['routing']['node']]['name']} to #{nodes['nodes'][v['routing']['relocating_node']]['name']} Size: #{v['index']['size']} "
+      end
+    end
     if vals[0]['state'] == "RECOVERING"
-      puts "Index: #{index}  Shard: #{shard} Server: #{nodes['nodes'][vals[0]['routing']['node']]['name']} Size: #{vals[0]['index']['size']}"
+      puts "RECOVERING: #{vals[0]['state']} Index: #{index}  Shard: #{shard} Server: #{nodes['nodes'][vals[0]['routing']['node']]['name']} Size: #{vals[0]['index']['size']}"
     end
   end
 end
