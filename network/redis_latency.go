@@ -1,5 +1,7 @@
 package main
 
+// MAKE SURE TO SET export GOMAXPROCS=16  in your environment before running
+
 import "fmt"
 import "flag"
 import "time"
@@ -40,20 +42,20 @@ func errHndlr(err error) {
 }
 
 func worker(id int, jobs <-chan int, results chan<- int, hostame string, port int) {
+	c, err := redis.DialTimeout("tcp", fmt.Sprintf("%s:%d", hostname, port), time.Duration(3)*time.Second)
 	for j := range jobs {
-		c, err := redis.DialTimeout("tcp", fmt.Sprintf("%s:%d", hostname, port), time.Duration(3)*time.Second)
 		errHndlr(err)
-		r := c.Cmd("select", 1)
-		errHndlr(r.Err)
+		// r := c.Cmd("select", 1) < - this will not work with nutcracker since it only allows you to set 1 DB
 		s := randomString(20)
 		now := time.Now()
-		r = c.Cmd("set", s, s)
+		r := c.Cmd("set", s, s)
+		errHndlr(r.Err)
 		r = c.Cmd("get", s)
 		later := time.Now()
 		fmt.Println("request:", j, "time:", later.Sub(now))
-		c.Close()
 		results <- 1
 	}
+	c.Close()
 }
 
 var hostname string
