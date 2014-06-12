@@ -39,9 +39,9 @@ func errHndlr(err error) {
 	}
 }
 
-func worker(id int, jobs <-chan int, results chan<- int) {
+func worker(id int, jobs <-chan int, results chan<- int, hostame string, port int) {
 	for j := range jobs {
-		c, err := redis.DialTimeout("tcp", "172.19.48.11:6380", time.Duration(10)*time.Second)
+		c, err := redis.DialTimeout("tcp", fmt.Sprintf("%s:%d", hostname, port), time.Duration(3)*time.Second)
 		errHndlr(err)
 		r := c.Cmd("select", 1)
 		errHndlr(r.Err)
@@ -56,11 +56,17 @@ func worker(id int, jobs <-chan int, results chan<- int) {
 	}
 }
 
+var hostname string
+var port int
+var concurrent int
+var requests int
+
 func init() {
 	flag.StringVar(&hostname, "hostname", "localhost", "hostname or ip to scan")
 	flag.IntVar(&port, "port", 6379, "port to try to connect to")
 	flag.IntVar(&concurrent, "concurrent", 10, "number of workers to run")
 	flag.IntVar(&requests, "requests", 10000, "number of requests to run")
+	flag.Parse()
 }
 
 func main() {
@@ -68,24 +74,24 @@ func main() {
     // In order to use our pool of workers we need to send
     // them work and collect their results. We make 2
     // channels for this.
-    jobs := make(chan int, 1000000)
-    results := make(chan int, 1000000)
+    jobs := make(chan int, requests)
+    results := make(chan int, requests)
 
     // This starts up 3 workers, initially blocked
     // because there are no jobs yet.
-    for w := 1; w <= 128; w++ {
-        go worker(w, jobs, results)
+    for w := 1; w <= concurrent; w++ {
+        go worker(w, jobs, results, hostname, port)
     }
 
     // Here we send 9999999 `jobs` and then `close` that
     // channel to indicate that's all the work we have.
-    for j := 1; j <= 10000; j++ {
+    for j := 1; j <= requests; j++ {
         jobs <- j
     }
     close(jobs)
 
     // Finally we collect all the results of the work.
-    for a := 1; a <= 1000000; a++ {
+    for a := 1; a <= requests; a++ {
         <-results
     }
 }
