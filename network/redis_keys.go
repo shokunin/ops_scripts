@@ -42,7 +42,7 @@ func worker(id int, jobs <-chan string, results chan<- string, hostame string, p
 		k := c.Cmd("SELECT", database)
 		k = c.Cmd("DEBUG", "OBJECT", j)
 		match := re.FindStringSubmatch(fmt.Sprintf("%s", k))
-		if len(match) != 0 {fmt.Printf("%s:%s:%d:%d%s\n", match[1], hostname, port, database, j)}
+		if len(match) != 0 {fmt.Printf("%s:%s:%d:%d:%s\n", match[1], hostname, port, database, j)}
 		results <- "OK"
 	}
 	c.Close()
