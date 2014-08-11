@@ -6,12 +6,12 @@ package main
 
 import "fmt"
 import "flag"
+import "time"
+import "os"
 import "io/ioutil"
 import "encoding/json"
-import "os"
+import "github.com/fzzy/radix/redis"
 //import "reflect"
-
-// import "github.com/fzzy/radix/redis"
 
 func check(err error) {
 	if err != nil {
@@ -27,6 +27,7 @@ func init() {
 	flag.Parse()
 }
 
+// ********************   Configuration information
 type Redisbox struct {
 	Hostname string `json:"hostname"`
 	Port     int32  `json:"port"`
@@ -43,6 +44,18 @@ func (rc *RedisServers) FromJson(jsonStr string) error {
 	return json.Unmarshal(b, data)
 }
 
+// ********************   Worker Pool information
+func worker(id int, jobs <-chan Redisbox, results chan<- string) {
+	for j := range jobs {
+	  c, err := redis.DialTimeout("tcp", fmt.Sprintf("%s:%d", j.Hostname, j.Port), time.Duration(3)*time.Second)
+		check(err)
+		c.Cmd("PING")
+		results <- "OK"
+	  c.Close()
+	}
+}
+
+
 func main() {
 
 	boxen := new(RedisServers)
@@ -50,10 +63,20 @@ func main() {
 	check(err)
 	cfgerr := boxen.FromJson(string(cfg))
 	check(cfgerr)
+	jobs := make(chan Redisbox, len(boxen.Pool))
+	results := make(chan string, len(boxen.Pool))
+
+    for w := 0; w <= 8; w++ {
+        go worker(w, jobs, results)
+    }
+
 	for k, v := range boxen.Pool {
 		fmt.Println(k)
-		fmt.Println(v.Hostname)
-		fmt.Println(v.Port)
-		fmt.Println(v.Database)
+		jobs <- v
 	}
+    // Finally we collect all the results of the work.
+    for a := 0; a <= len(boxen.Pool)-1; a++ {
+        <-results
+    }
+	os.Exit(0)
 }
