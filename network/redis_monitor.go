@@ -9,7 +9,8 @@ import "flag"
 import "io/ioutil"
 import "encoding/json"
 import "os"
-import "reflect"
+//import "reflect"
+
 // import "github.com/fzzy/radix/redis"
 
 func check(err error) {
@@ -27,9 +28,9 @@ func init() {
 }
 
 type Redisbox struct {
-	Hostname	string `json:"hostname"`
-	Port		int32  `json:"port"`
-	Database	int32  `json:"database"`
+	Hostname string `json:"hostname"`
+	Port     int32  `json:"port"`
+	Database int32  `json:"database"`
 }
 
 type RedisServers struct {
@@ -49,6 +50,10 @@ func main() {
 	check(err)
 	cfgerr := boxen.FromJson(string(cfg))
 	check(cfgerr)
-	fmt.Println("type:", reflect.TypeOf(boxen))
-	// Need to figure out how iterate thru
+	for k, v := range boxen.Pool {
+		fmt.Println(k)
+		fmt.Println(v.Hostname)
+		fmt.Println(v.Port)
+		fmt.Println(v.Database)
+	}
 }
