@@ -6,23 +6,11 @@ require 'erb'
 module_name = ARGV[0]
 
 ########################################################
-# Check to make sure this is possible
-if module_name.nil?
-  puts "Takes module name as a first argument"
-  exit! 1
-end
-
 unless Dir.pwd.split('/')[-1] == 'modules'
   puts "Need to be in your modules directory"
   exit! 1
 end
 
-
-########################################################
-# Create the directories
-[ 'templates', 'manifests', 'files' ].each do |mydir|
-  FileUtils.mkpath("#{module_name}/#{mydir}")
-end
 
 ########################################################
 # Create the readme file
@@ -31,30 +19,12 @@ readme_template = ERB.new <<-EOF
 <%= underline %>
 
 EOF
-readme=File.open("#{module_name}/Readme.md", 'w')
-readme.puts readme_template.result(binding)
-readme.close
-
-########################################################
-#  build the init file
-init_template = ERB.new <<-EOF
-# Init for <%= module_name %>
-class <%= module_name %> {<% ['packages', 'configure', 'services'].each do |s| %>
-  include <%= module_name %>::<%= s %><% end %>
-}
-EOF
-
-init=File.open("#{module_name}/manifests/init.pp", 'w')
-init.puts init_template.result(binding)
-init.close
-
-########################################################
-# Generate the manifest files
-['packages', 'configure', 'services'].each do |manifest|
-  manifest_file=File.open("#{module_name}/manifests/#{manifest}.pp", 'w')
-  manifest_file.puts "# #{module_name}::#{manifest} setup\nclass #{module_name}::#{manifest}{\n  \n}"
-  manifest_file.close
+unless File.exists? "#{module_name}/Readme.md"
+  readme=File.open("#{module_name}/Readme.md", 'w')
+  readme.puts readme_template.result(binding)
+  readme.close
 end
+
 
 ########################################################
 # RSPEC init
