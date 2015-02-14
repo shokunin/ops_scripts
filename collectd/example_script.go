@@ -22,6 +22,7 @@ func collectd(unixTs int, hostname string) {
 	f := bufio.NewWriter(os.Stdout)
 	defer f.Flush()
 	b := "PUTVAL " + hostlabel + "/" + "bar" + "/" + "gauge-name " + strconv.Itoa(unixTs) + ":" + "value\n"
+	b += "PUTVAL " + hostlabel + "/" + "bar" + "/" + "counter-name " + strconv.Itoa(unixTs) + ":" + "value2\n"
 	f.Write([]byte(b))
 }
 
