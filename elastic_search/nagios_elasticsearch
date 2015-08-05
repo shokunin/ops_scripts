@@ -1,8 +1,10 @@
 #!/usr/bin/env ruby
 #################################################################
-#   Prints out information on what is happening when ElasticSearch
-#   is recovering.  Run in a loop to see what's happening
-#   while true; do ./show_es_recovery_status.rb es-master; done
+#   Hits the cluster health from the API
+#   When status is green  - OK
+#   When status is yellow - Warning
+#   When status is red    - Critical
+#   When error connecting - Critical
 #################################################################
 
 require 'rubygems'
