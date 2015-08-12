@@ -64,4 +64,4 @@ rescue Exception => e
 end
 
 puts outstring
-exit! exit_code
+exit exit_code
