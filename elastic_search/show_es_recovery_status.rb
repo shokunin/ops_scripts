@@ -1,4 +1,4 @@
-#!/bin/env ruby
+#!/usr/bin/env ruby
 #################################################################
 #   Prints out information on what is happening when ElasticSearch
 #   is recovering.  Run in a loop to see what's happening
