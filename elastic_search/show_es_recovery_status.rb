@@ -37,11 +37,14 @@ status['indices'].each do |index, info|
   info['shards'].each do |shard, vals|
     vals.each do |v|
       if v['routing']['state'] == "RELOCATING"
-        puts "RELOCATING: Index: #{v['routing']['index']} Shard: #{v['routing']['shard']} from #{nodes['nodes'][v['routing']['node']]['name']} to #{nodes['nodes'][v['routing']['relocating_node']]['name']} Size: #{v['index']['size']} "
+        puts "RELOCATING: Index: #{v['routing']['index']} Shard: #{v['routing']['shard']} from #{nodes['nodes'][v['routing']['node']]['name']} to #{nodes['nodes'][v['routing']['relocating_node']]['name']} Size: #{v['index']['size_in_bytes']} "
       end
     end
     if vals[0]['state'] == "RECOVERING"
-      puts "RECOVERING: #{vals[0]['state']} Index: #{index}  Shard: #{shard} Server: #{nodes['nodes'][vals[0]['routing']['node']]['name']} Size: #{vals[0]['index']['size']}"
+      puts "RECOVERING: #{vals[0]['state']} Index: #{index}  Shard: #{shard} Server: #{nodes['nodes'][vals[0]['routing']['node']]['name']} Size: #{vals[0]['index']['size_in_bytes']}"
+      recover_percent=return_info("/#{index}/_recovery?active_only=true")
+      recover_percent[index]['shards'].select{ |z| z['id'].to_s == shard }.each { |rshard| p rshard['index']['files']['percent']}
+      puts ""
     end
   end
 end
