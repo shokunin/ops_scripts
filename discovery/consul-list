@@ -1,0 +1,76 @@
+#!/usr/bin/env ruby
+
+require 'json'
+require 'net/http'
+require 'uri'
+require 'getoptlong'
+
+
+def api_fetch(url, params={})
+  begin
+    url = URI.parse(url)
+    url.query = URI.encode_www_form( params )
+    JSON.parse(Net::HTTP.get(url))
+  rescue Exception => e
+    STDERR.puts "Error retrieving: #{url}: #{e.message}"
+    exit! 1
+  end
+end
+
+#def print_help() {
+def print_help
+  puts(<<-EOT)
+  Usage:
+
+    To list all of the IPS on a consul server that start with name elasticdata run
+    consul-list -d consul-prod.aws.example.com --host elasticdata --output Address
+
+    To list all of the hostname on a consul server that start with name elasticdata run
+    consul-list -d consul-prod.aws.example.com --host elasticdata --output Node
+
+  EOT
+end
+
+args = {  
+          :datacenter => 'consul-prod.aws.example.com',
+          :output => 'Address',
+          :help => false,
+          :regexp => /./,
+}
+
+opts = GetoptLong.new(
+  [ '--dc',       '-d', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--host',     '-H', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--help',     '-h', GetoptLong::NO_ARGUMENT ],
+  [ '--output',   '-o', GetoptLong::OPTIONAL_ARGUMENT ]
+)
+
+opts.each do |opt, arg|
+  case opt
+    when '--dc'
+      args[:datacenter] = arg
+    when '--host'
+      args[:regexp] = arg
+    when '--output'
+      args[:output] = arg
+    when '--help'
+      args[:help] = true
+  end
+end
+
+if args[:help]
+  print_help
+  exit!
+end
+
+r1 = Regexp.compile(args[:regexp])
+outhosts=[]
+
+consul_url = "http://#{args[:datacenter]}:8500/v1/catalog/nodes"
+api_fetch(consul_url).each do |x|
+  if x['Node'].match r1
+    outhosts << x[args[:output]]
+  end
+end
+
+puts outhosts.join(' ')
