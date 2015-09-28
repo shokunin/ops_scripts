@@ -19,9 +19,15 @@ end
 BASE_URL = "http://#{ARGV[0]}:9200"
 
 def return_info(path)
-  es_url = URI.parse("#{BASE_URL}#{path}")
-  response = Net::HTTP.get_response(es_url)
-  JSON.parse(response.body)
+  begin
+    es_url = URI.parse("#{BASE_URL}#{path}")
+    http = Net::HTTP.new(es_url.host, es_url.port)
+    http.read_timeout = 500
+    response = http.request(Net::HTTP::Get.new(es_url.request_uri))
+    JSON.parse(response.body)
+  rescue Exception => e
+    puts "ERROR: #{e.message}"
+  end
 end
 
 nodes = return_info("/_nodes")
