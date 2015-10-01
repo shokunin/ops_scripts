@@ -1,0 +1,67 @@
+#!/usr/bin/env ruby
+#################################################################
+#   Hits the cluster health from the API
+#   When status is green  - OK
+#   When status is yellow - Warning
+#   When status is red    - Critical
+#   When error connecting - Critical
+#################################################################
+
+require 'rubygems'
+require 'json'
+require 'net/http'
+require 'uri'
+require 'pp'
+require 'getoptlong'
+
+outstring = "UNKNOWN: an unknown failure occured"
+exit_code = 256
+
+#set defaults
+args = {
+    :host        => 'localhost',
+    :port        => 9200,
+}
+
+opts = GetoptLong.new(
+  [ '--host', '-H', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--port', '-p', GetoptLong::OPTIONAL_ARGUMENT ],
+)
+
+opts.each do |opt, arg|
+  case opt
+    when '--host'
+      args[:host] = arg
+    when '--port'
+      args[:port] = arg.to_i
+  end
+end
+
+begin
+  BASE_URL = "http://#{args[:host]}:#{args[:port]}"
+
+  def return_info(path)
+    es_url = URI.parse("#{BASE_URL}#{path}")
+    response = Net::HTTP.get_response(es_url)
+    JSON.parse(response.body)
+  end
+
+  x = return_info("/_cluster/health")
+  if x['status'] == 'green'
+    outstring = "OK: status is #{x['status']} for #{args[:host]}:#{args[:port]}"
+    exit_code = 0
+  elsif x['status'] == 'yellow'
+    outstring = "WARNING: status is #{x['status']} for #{args[:host]}:#{args[:port]}"
+    exit_code = 1
+  elsif x['status'] == 'red'
+    outstring = "CRITICAL: status is #{x['status']} for #{args[:host]}:#{args[:port]}"
+    exit_code = 2
+  end
+
+rescue Exception => e
+  outstring = "CRITICAL: error #{e.message} for #{args[:host]}:#{args[:port]}"
+  exit_code = 2
+end
+
+puts outstring
+exit exit_code

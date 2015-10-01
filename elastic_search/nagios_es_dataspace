@@ -1,0 +1,65 @@
+#!/usr/bin/env ruby
+#################################################################
+#   Check percentage of file storaged used on the cluster
+#   --threshold is default 85%
+#################################################################
+
+require 'rubygems'
+require 'json'
+require 'net/http'
+require 'uri'
+require 'pp'
+require 'getoptlong'
+
+outstring = "USED: "
+exit_code = 256
+
+#set defaults
+args = {
+    :host        => 'localhost',
+    :port        => 9200,
+    :threshold   => 85.0,
+}
+
+opts = GetoptLong.new(
+  [ '--host', '-H', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--port', '-p', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--threshold', '-t', GetoptLong::OPTIONAL_ARGUMENT ],
+)
+
+opts.each do |opt, arg|
+  case opt
+    when '--host'
+      args[:host] = arg
+    when '--port'
+      args[:port] = arg.to_i
+    when '--threshold'
+      args[:threshold] = arg.to_f
+  end
+end
+
+begin
+  BASE_URL = "http://#{args[:host]}:#{args[:port]}"
+
+  def return_info(path)
+    es_url = URI.parse("#{BASE_URL}#{path}")
+    response = Net::HTTP.get_response(es_url)
+    JSON.parse(response.body)
+  end
+
+  x = return_info('/_nodes/_all/stats/fs')
+  x['nodes'].each do |node|
+    per_disk_used = 100-(100*node[1]['fs']['total']['free_in_bytes']/node[1]['fs']['total']['total_in_bytes'])
+    outstring += "#{node[1]['name']}: #{per_disk_used}\% "
+    if per_disk_used > args[:threshold]
+      exit_code = 2
+    end
+  end
+
+rescue Exception => e
+  outstring = "CRITICAL: error #{e.message} for #{args[:host]}:#{args[:port]}"
+  exit_code = 2
+end
+
+puts outstring
+exit exit_code
