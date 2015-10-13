@@ -1,14 +1,13 @@
 package main
 
 // MAKE SURE TO SET export GOMAXPROCS=16  in your environment before running
+// This iterates through the redis keys and deletes with an lru_idle longer than x seconds
 
 import "fmt"
 import "flag"
 import "time"
 import "os"
-import "regexp"
 
-// import "reflect"
 import "github.com/fzzy/radix/redis"
 
 func fetchAllKeys(hostame string, port int, database int) []string {
@@ -33,17 +32,13 @@ func errHndlr(err error) {
 }
 
 func worker(id int, jobs <-chan string, results chan<- string, hostame string, port int, database int) {
-	re := regexp.MustCompile("serializedlength:([0-9]+)")
 	c, err := redis.DialTimeout("tcp", fmt.Sprintf("%s:%d", hostname, port), time.Duration(3)*time.Second)
 	errHndlr(err)
 	for j := range jobs {
 		errHndlr(err)
 		k := c.Cmd("SELECT", database)
-		k = c.Cmd("DEBUG", "OBJECT", j)
-		match := re.FindStringSubmatch(fmt.Sprintf("%s", k))
-		if len(match) != 0 {
-			fmt.Printf("%s:%s:%d:%d:%s\n", match[1], hostname, port, database, j)
-		}
+		k = c.Cmd("TTL", j)
+		fmt.Println(j, ",", k)
 		results <- "OK"
 	}
 	c.Close()

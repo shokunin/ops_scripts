@@ -1,13 +1,13 @@
 package main
 
 import (
-	"flag"
-	"github.com/kylelemons/go-gypsy/yaml"
 	"database/sql"
-	_ "github.com/go-sql-driver/mysql"
+	"flag"
 	"fmt"
-	"os"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/kylelemons/go-gypsy/yaml"
 	"io"
+	"os"
 	"time"
 )
 
@@ -24,7 +24,6 @@ func init() {
 
 func main() {
 
-
 	config, err := yaml.ReadFile(configfile)
 
 	c1 := make(chan bool)
@@ -40,7 +39,7 @@ func main() {
 				c1 <- false
 			}
 
-			defer db.Close
+			//defer db.Close
 
 		}
 	}()
@@ -50,18 +49,18 @@ func main() {
 		c1 <- false
 	}()
 	//##################################################################################
-	go func () {
+	go func() {
 		for {
 			select {
-				case msg1 := <- c1:
-					if msg1 {
-						io.WriteString(os.Stdout, "OK: able to create and fetch a record\n")
-						os.Stdout.Sync()
-						os.Exit(0)
-					} else {
-						os.Exit(2)
-					}
+			case msg1 := <-c1:
+				if msg1 {
+					io.WriteString(os.Stdout, "OK: able to create and fetch a record\n")
+					os.Stdout.Sync()
+					os.Exit(0)
+				} else {
+					os.Exit(2)
 				}
+			}
 		}
 	}()
 	var input bool
