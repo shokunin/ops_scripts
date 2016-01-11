@@ -1,0 +1,54 @@
+#!/usr/bin/env ruby
+#
+################################################################################
+# 
+# ./logstash_json_type_mismatch_finder <JSON_LOG_FILE>
+# This prints out entries where the types are set differently 
+# eg => appserver.raw_data.fields.user_id {String=>"2113888", Fixnum=>456789101}
+#
+# Note: we change FalseClass and TrueClass to Boolean which doesn't really exist....
+#
+################################################################################
+
+require 'json'
+require 'pp'
+
+final_hash = {}
+
+def flat_hash(hash, k = [])
+  return {k => hash} unless hash.is_a?(Hash)
+  hash.inject({}){ |h, v| h.merge! flat_hash(v[-1], k + [v[0]]) }
+end
+
+def type_hash(hash)
+  type_hash = {}
+  hash.each { |k, v| type_hash[k.join('.')] = v }
+  type_hash
+end
+
+logf = File.open(ARGV[0], 'r')
+logf.readlines.each do |w|
+  type_hash(flat_hash(JSON.parse(w))).each do |k, v|
+    if v.class.to_s =~/(True|False)Class/
+      jtype = "Boolean"
+    else
+      jtype = v.class.to_s
+    end
+    if final_hash.has_key? k
+      if final_hash[k].has_key? jtype
+        final_hash[k][jtype] = v
+      else
+        final_hash[k][jtype] = v
+      end
+    else
+      final_hash[k] = { jtype => v }
+    end
+  end
+
+end
+
+final_hash.each do |k, v| 
+  if v.length > 1
+    puts "#{k} #{v.inspect}"
+  end
+end
