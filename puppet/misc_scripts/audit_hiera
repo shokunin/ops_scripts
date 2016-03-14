@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+require 'yaml'
+
+HIERA_PATH=ARGV[0]
+
+
+yamls=Dir.glob("#{HIERA_PATH}/*/*.yaml")
+
+yamls.each do |f|
+  info = YAML.load_file(f)
+  if info.has_key? "tru_config"
+    if info['MYCONF'].has_key? "server"
+      puts "#{File.basename(f).gsub('.yaml', '')} =>  #{info['tru_config']['server'].inspect}"
+    end
+  end
+end
+
