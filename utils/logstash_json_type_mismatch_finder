@@ -13,6 +13,7 @@
 require 'json'
 require 'pp'
 
+error_lines = []
 final_hash = {}
 line = 0
 
@@ -47,8 +48,9 @@ logf.readlines.each do |w|
         final_hash[k] = { jtype => v }
       end
     end
-  rescue
-    puts "error in line: #{line}"
+  rescue Exception => e
+    puts "error in line: #{line}: #{e.message}"
+    error_lines << line
   end
 
 end
@@ -57,4 +59,9 @@ final_hash.each do |k, v|
   if v.length > 1
     puts "#{k} #{v.inspect}"
   end
+end
+
+if error_lines.length > 0 
+  puts "###########################################################"
+  puts "ERROR:line Count =>  #{error_lines.length}"
 end
