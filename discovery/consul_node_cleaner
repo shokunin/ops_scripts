@@ -1,0 +1,78 @@
+#!/usr/bin/env ruby
+
+require 'json'
+require 'net/http'
+require 'getoptlong'
+
+def print_usage
+  puts "consul_node_cleaner --host <CONSUL_HOST: default localhost> --port <PORT: default 8500> --datacenter <NEED TO SPECIFY>"
+  puts "A datacenter must be specified"
+end
+
+down_nodes = []
+
+args = {
+    :host       => 'localhost',
+    :port       => 8500,
+    :path       => '',
+    :datacenter => '',
+}
+
+opts = GetoptLong.new(
+  [ '--host', '-H', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--port', '-p', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--datacenter', '-d', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--path', '-P', GetoptLong::OPTIONAL_ARGUMENT ]
+)
+
+opts.each do |opt, arg|
+  case opt
+    when '--host'
+      args[:host] = arg
+    when '--port'
+      args[:port] = arg.to_i
+    when '--path'
+      args[:path] = arg
+    when '--datacenter'
+      args[:datacenter] = arg
+  end
+end
+
+if args[:datacenter] == '' 
+  print_usage
+  exit! 1
+end
+
+def api_fetch(url, params, is_json=true)
+  begin
+    url = URI.parse(url)
+    url.query = URI.encode_www_form( params )
+    if is_json
+      JSON.parse(Net::HTTP.get(url))
+    else
+      ["OK"]
+    end
+  rescue Exception => e
+    STDERR.puts "Error retrieving: #{url}: #{e.message}"
+    exit! 1
+  end
+end
+
+api_fetch("http://#{args[:host]}:#{args[:port]}/v1/catalog/nodes", {}).each do |node|
+  api_fetch("http://#{args[:host]}:#{args[:port]}/v1/health/node/#{node['Node']}", {} ).select{ |i| i['CheckID'] == 'serfHealth'}.select{ |j| j['Status'] == 'critical'}.each do |m|
+    down_nodes << m['Node']
+  end
+end
+
+down_nodes.each do |dn|
+  puts "forcing #{dn}"
+  api_fetch("http://#{args[:host]}:#{args[:port]}/v1/agent/force-leave/#{dn}", {}, false)
+  dereg_url = URI.parse("http://#{args[:host]}:#{args[:port]}/v1/catalog/deregister")
+  req = Net::HTTP::Put.new(dereg_url.path, initheader = { 'Content-Type' => 'application/x-www-form-urlencoded'})
+  req.body = "{\"Datacenter\": \"#{args[:datacenter]}\", \"Node\":\"#{dn}\"}"
+  response = Net::HTTP.new(dereg_url.host, dereg_url.port).start {|http| http.request(req) }
+  puts "forcing removal of  #{dn}, status #{response.code}"
+
+end
+
+
