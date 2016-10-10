@@ -1,0 +1,76 @@
+#!/usr/bin/env ruby
+
+############################################################################
+#  This script will output the count and percentage of a for an index
+# ./aggregation_example --host logstash.example.com -i logstash-2015.10.16 -f type
+# Field                        Docs      Percent
+# ----------------------------------------------------------------
+# app_json                 36678589    58.805252
+# json_nginx               15813654    25.353372
+# ruby_error_log            4788048     7.676478
+# mysql_err                 3121687     5.004871
+
+
+require 'rubygems'
+require 'net/http'
+require 'json'
+require 'uri'
+require 'getoptlong'
+
+args = {
+    :host     => 'localhost',
+    :port     => 9200,
+    :index    => '',
+    :field    => 'type'
+}
+
+opts = GetoptLong.new(
+  [ '--host', '-H', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--index', '-i', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--port', '-p', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--field', '-f', GetoptLong::OPTIONAL_ARGUMENT ]
+)
+
+opts.each do |opt, arg|
+  case opt
+    when '--host'
+      args[:host] = arg
+    when '--port'
+      args[:port] = arg.to_i
+    when '--field'
+      args[:field] = arg
+    when '--index'
+      args[:index] = arg
+  end
+end
+
+if args[:index] == '' 
+  puts "You need to specify an index like logstash-2015.01.02"
+  exit! 1
+end
+
+
+begin
+  uri = URI.parse("http://#{args[:host]}:#{args[:port]}/#{args[:index]}/_search")
+  payload = {"size"=>0, "aggs"=>{"group_by_state"=>{"terms"=>{"field"=>args[:field], "size"=>2147483647}}}}
+  puts uri
+  puts payload
+  req = Net::HTTP::Post.new(uri.path, initheader = {'Content-Type' =>'application/json'})
+  req.body = payload.to_json
+  response = Net::HTTP.new(uri.host, uri.port).start {|http| http.request(req) }
+  if response.code == "200"
+    agg = JSON.parse(response.body)
+  else
+    puts "HTTP/#{response.code} error fetching data from http://#{args[:host]}:#{args[:port]}/#{args[:index]}/_search"
+  end
+
+rescue Exception => e
+  puts "Error: #{e.message}"
+end
+
+printf("%-20s %12s %12s\n", "Field", "Docs", "Percent")
+puts "----------------------------------------------------------------"
+agg['aggregations']['group_by_state']['buckets'].each do |bucket|
+  #puts "#{bucket['key']}, #{bucket['doc_count']}, #{bucket['doc_count']*100/agg['hits']['total']}"
+  printf("%-20s %12d %12f\n", bucket['key'], bucket['doc_count'], (bucket['doc_count']*100.0/agg['hits']['total']))
+end

@@ -1,0 +1,15 @@
+GEM
+  remote: http://rubygems.org/
+  specs:
+    dnsruby (1.59.1)
+    ruby-pcap (0.7.9)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  dnsruby
+  ruby-pcap
+
+BUNDLED WITH
+   1.11.2
