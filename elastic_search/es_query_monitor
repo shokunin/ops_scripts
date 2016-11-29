@@ -1,0 +1,87 @@
+#!/usr/bin/env ruby
+
+############################################################################
+#  This script will output the count and percentage of a for an index
+# ./es_query_monitor --query-file queries.yml --host logstash.example.com 
+#
+# You will need to create a query file similar to the following
+# ---
+# - :name: apache_json_count_nomad
+#   :query: 'type: "json_apache" AND tru_role: "prod_nomad1"'
+# - :name: apache_json_count_not_nomad
+#   :query: 'type: "json_apache" AND NOT tru_role: "prod_nomad1"'
+# 
+# And it will ouput to STDOUT
+# apache_json_count_nomad 147674
+# apache_json_count_not_nomad 62784
+
+require 'rubygems'
+require 'net/http'
+require 'json'
+require 'yaml'
+require 'uri'
+require 'getoptlong'
+
+args = {
+    :host       => 'localhost',
+    :port       => 9200,
+    :query_file => '',
+    :index      => "logstash-#{Time.now.utc.year}.#{Time.now.utc.month}.#{Time.now.utc.day}",
+}
+
+opts = GetoptLong.new(
+  [ '--host', '-H', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--port', '-p', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--index', '-i', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--query-file', '-q', GetoptLong::OPTIONAL_ARGUMENT ],
+)
+
+opts.each do |opt, arg|
+  case opt
+    when '--host'
+      args[:host] = arg
+    when '--port'
+      args[:port] = arg.to_i
+    when '--query-file'
+      args[:query_file] = arg
+    when '--index'
+      args[:index] = arg
+  end
+end
+
+if args[:query_file] == '' 
+  puts "You need to specify a query file"
+  exit! 1
+end
+
+checks=YAML.load_file args[:query_file]
+
+checks.each do |chk|
+
+  begin
+    uri = URI.parse("http://#{args[:host]}:#{args[:port]}/#{args[:index]}/_search")
+    payload = {"query"=>
+                {"filtered"=>
+                  {"query"=>
+                    {"bool"=>{"should"=>[{"query_string"=>{"query"=>chk[:query]}}]}},
+                    "filter"=>{"bool"=>{"must"=>[{"range"=>{"@timestamp"=>{"from"=>(Time.now.utc.to_i-300)*1000, "to"=>(Time.new.utc.to_i)*1000}}}]}}
+                  }
+                },
+                "size"=>0
+              }
+               
+    req = Net::HTTP::Post.new(uri.path, initheader = {'Content-Type' =>'application/json'})
+    req.body = payload.to_json
+    response = Net::HTTP.new(uri.host, uri.port).start {|http| http.request(req) }
+    if response.code == "200"
+      agg = JSON.parse(response.body)
+    else
+      STDERR.puts "HTTP/#{response.code} error fetching data from http://#{args[:host]}:#{args[:port]}/#{args[:index]}/_search"
+    end
+    puts "#{chk[:name]} #{agg['hits']['total']}"
+
+  rescue Exception => e
+    STDERR.puts "Error: #{e.message}"
+  end
+
+end
