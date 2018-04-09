@@ -4,6 +4,8 @@ package main
 
 import "fmt"
 import "strings"
+import "strconv"
+import "golang.org/x/sync/syncmap"
 import "flag"
 import "time"
 import "os"
@@ -30,7 +32,7 @@ func errHndlr(err error) {
 	}
 }
 
-func worker(id int, jobs <-chan string, results chan<- string, hostame string, port int, database int) {
+func worker(id int, jobs <-chan string, results chan<- string, hostame string, port int, database int, sm *syncmap.Map) {
 	c, err := redis.DialTimeout("tcp", fmt.Sprintf("%s:%d", hostname, port), time.Duration(3)*time.Second)
 	errHndlr(err)
 	for j := range jobs {
@@ -56,7 +58,13 @@ func worker(id int, jobs <-chan string, results chan<- string, hostame string, p
 					rsize += uint64(len(y))
 				}
 			}
-			fmt.Println("total size: ", rsize, "customer: ", s[len(s)-1])
+			val, hasVal := sm.Load(s[len(s)-1])
+			if hasVal {
+				i, _ := strconv.ParseUint(val.(string), 10, 64)
+				sm.Store(s[len(s)-1], fmt.Sprintf("%d", rsize+i))
+			} else {
+				sm.Store(s[len(s)-1], fmt.Sprintf("%d", (rsize)))
+			}
 		}
 		results <- "OK"
 	}
@@ -78,6 +86,8 @@ func init() {
 
 func main() {
 
+	sm := new(syncmap.Map)
+
 	keys := fetchAllKeys(hostname, port, database)
 	// In order to use our pool of workers we need to send
 	// them work and collect their results. We make 2
@@ -86,7 +96,7 @@ func main() {
 	results := make(chan string, len(keys))
 
 	for w := 0; w <= concurrent; w++ {
-		go worker(w, jobs, results, hostname, port, database)
+		go worker(w, jobs, results, hostname, port, database, sm)
 	}
 
 	for j := 0; j <= len(keys)-1; j++ {
@@ -98,5 +108,10 @@ func main() {
 	for a := 0; a <= len(keys)-1; a++ {
 		<-results
 	}
+	sm.Range(func(k, v interface{}) bool {
+		fmt.Printf("%s,%s\n", v, k)
+		return true
+	})
+
 	os.Exit(0)
 }
