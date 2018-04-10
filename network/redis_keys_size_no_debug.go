@@ -5,6 +5,7 @@ package main
 import "fmt"
 import "strings"
 import "strconv"
+import "sync"
 import "golang.org/x/sync/syncmap"
 import "flag"
 import "time"
@@ -32,7 +33,7 @@ func errHndlr(err error) {
 	}
 }
 
-func worker(id int, jobs <-chan string, results chan<- string, hostame string, port int, database int, sm *syncmap.Map) {
+func worker(id int, jobs <-chan string, results chan<- string, hostame string, port int, database int, sm *syncmap.Map, mutex *sync.Mutex) {
 	c, err := redis.DialTimeout("tcp", fmt.Sprintf("%s:%d", hostname, port), time.Duration(3)*time.Second)
 	errHndlr(err)
 	for j := range jobs {
@@ -58,6 +59,7 @@ func worker(id int, jobs <-chan string, results chan<- string, hostame string, p
 					rsize += uint64(len(y))
 				}
 			}
+			mutex.Lock()
 			val, hasVal := sm.Load(s[len(s)-1])
 			if hasVal {
 				i, _ := strconv.ParseUint(val.(string), 10, 64)
@@ -65,6 +67,7 @@ func worker(id int, jobs <-chan string, results chan<- string, hostame string, p
 			} else {
 				sm.Store(s[len(s)-1], fmt.Sprintf("%d", (rsize)))
 			}
+			mutex.Unlock()
 		}
 		results <- "OK"
 	}
@@ -87,6 +90,7 @@ func init() {
 func main() {
 
 	sm := new(syncmap.Map)
+	var mutex = &sync.Mutex{}
 
 	keys := fetchAllKeys(hostname, port, database)
 	// In order to use our pool of workers we need to send
@@ -96,7 +100,7 @@ func main() {
 	results := make(chan string, len(keys))
 
 	for w := 0; w <= concurrent; w++ {
-		go worker(w, jobs, results, hostname, port, database, sm)
+		go worker(w, jobs, results, hostname, port, database, sm, mutex)
 	}
 
 	for j := 0; j <= len(keys)-1; j++ {
