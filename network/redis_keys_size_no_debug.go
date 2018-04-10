@@ -44,10 +44,19 @@ func worker(id int, jobs <-chan string, results chan<- string, hostame string, p
 		w, _ := z.Bytes()
 		if string(w) == "string" {
 			k := c.Cmd("GET", j)
+			s := strings.Split(j, ":")
 			rsize += uint64(unsafe.Sizeof(k))
 			y, _ := k.Bytes()
 			rsize += uint64(len(y))
-			fmt.Println("total size: ", rsize, "customer: ", j)
+			val, hasVal := sm.Load(s[len(s)-1])
+			mutex.Lock()
+			if hasVal {
+				i, _ := strconv.ParseUint(val.(string), 10, 64)
+				sm.Store(s[len(s)-1], fmt.Sprintf("%d", rsize+i))
+			} else {
+				sm.Store(s[len(s)-1], fmt.Sprintf("%d", (rsize)))
+			}
+			mutex.Unlock()
 		}
 		if string(w) == "hash" {
 			k := c.Cmd("HGETALL", j)
