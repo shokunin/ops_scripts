@@ -1,13 +1,23 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os/exec"
+	"strconv"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
+
+var port int
+
+func init() {
+	flag.IntVar(&port, "port", 8140, "port to open up to EIPs")
+	flag.Parse()
+}
 
 func getregions() []string {
 	var regions = []string{}
@@ -63,7 +73,7 @@ func geteips(region string) []string {
 		return eips
 	}
 
-	for _, j :=range result.Addresses {
+	for _, j := range result.Addresses {
 		eips = append(eips, *j.PublicIp)
 	}
 	return eips
@@ -72,8 +82,8 @@ func geteips(region string) []string {
 func main() {
 	regions := getregions()
 	for _, j := range regions {
-		for _, q :=  range geteips(j) {
-			cmd := exec.Command("/usr/sbin/ufw", "allow", "from", q, "to", "any", "port", "8140")
+		for _, q := range geteips(j) {
+			cmd := exec.Command("/usr/sbin/ufw", "allow", "from", q, "to", "any", "port", strconv.Itoa(port))
 			err := cmd.Run()
 			if err != nil {
 				fmt.Println("error adding ", q)
