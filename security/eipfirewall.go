@@ -3,19 +3,21 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os/exec"
-	"strconv"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"os/exec"
+	"strconv"
+	"strings"
 )
 
 var port int
+var trusted string
 
 func init() {
 	flag.IntVar(&port, "port", 8140, "port to open up to EIPs")
+	flag.StringVar(&trusted, "trusted", "", "comma separated cidrs to trust")
 	flag.Parse()
 }
 
@@ -81,12 +83,23 @@ func geteips(region string) []string {
 
 func main() {
 	regions := getregions()
+	nets := strings.Split(trusted, ",")
+	for _, k := range nets {
+		if len(k) > 0 {
+			cmd := exec.Command("/usr/sbin/ufw", "allow", "from", k, "to", "any")
+			err := cmd.Run()
+			if err != nil {
+				fmt.Println("error adding trusted net:", k)
+			}
+		}
+	}
+
 	for _, j := range regions {
 		for _, q := range geteips(j) {
 			cmd := exec.Command("/usr/sbin/ufw", "allow", "from", q, "to", "any", "port", strconv.Itoa(port))
 			err := cmd.Run()
 			if err != nil {
-				fmt.Println("error adding ", q)
+				fmt.Println("error adding IP:", q)
 			}
 		}
 	}
