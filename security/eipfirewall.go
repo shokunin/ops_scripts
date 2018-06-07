@@ -85,7 +85,7 @@ func main() {
 	nets := strings.Split(trusted, ",")
 	for _, k := range nets {
 		if len(k) > 0 {
-			cmd := exec.Command("/usr/sbin/ufw", "allow", "from", k, "to", "any")
+			cmd := exec.Command("/usr/sbin/ufw", "allow", "from", k, "to", "any", "comment", "eipfirewall-trusted")
 			err := cmd.Run()
 			if err != nil {
 				fmt.Println("error adding trusted net:", k)
@@ -97,7 +97,7 @@ func main() {
 		for _, q := range geteips(j) {
 			p := strings.Split(ports, ",")
 			for _, k := range p {
-				cmd := exec.Command("/usr/sbin/ufw", "allow", "from", q, "to", "any", "port", k)
+				cmd := exec.Command("/usr/sbin/ufw", "allow", "from", q, "to", "any", "port", k, "comment", "eipfirewall-eip")
 				err := cmd.Run()
 				if err != nil {
 					fmt.Println("error adding IP:", q, "port:", k)
