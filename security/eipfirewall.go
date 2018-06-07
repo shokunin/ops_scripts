@@ -11,11 +11,11 @@ import (
 	"strings"
 )
 
-var port string
+var ports string
 var trusted string
 
 func init() {
-	flag.StringVar(&port, "port", "8140", "port to open up to EIPs")
+	flag.StringVar(&ports, "ports", "8140", "comma separated ports to allow")
 	flag.StringVar(&trusted, "trusted", "", "comma separated cidrs to trust")
 	flag.Parse()
 }
@@ -95,8 +95,8 @@ func main() {
 
 	for _, j := range regions {
 		for _, q := range geteips(j) {
-			nets := strings.Split(port, ",")
-			for _, k := range nets {
+			p := strings.Split(ports, ",")
+			for _, k := range p {
 				cmd := exec.Command("/usr/sbin/ufw", "allow", "from", q, "to", "any", "port", k)
 				err := cmd.Run()
 				if err != nil {
