@@ -1,2 +1,4 @@
 network/src
 security/eipfirewall
+security/Gopkg.lock
+security/vendor/*
