@@ -9,6 +9,25 @@ require 'getoptlong'
 outstring = "UNKNOWN: an unknown failure occured"
 exit_code = 256
 
+def print_help 
+  puts(<<-EOT)
+  Usage:
+
+    Check to see if an elasticsearch index is being updated:
+
+  Help:
+    es_data_updating_check -h
+
+  Options:
+    --host    ElasticSearch node defaults to localhost
+    --port    ElasticSearch port defaults to 9200
+    --seconds Number of seconds where an update must have occured
+    --index   The index to query
+
+  EOT
+  
+end
+
 #set defaults
 args = {
     :host        => 'localhost',
@@ -19,6 +38,7 @@ args = {
 
 opts = GetoptLong.new(
   [ '--host', '-H', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--help', '-h', GetoptLong::OPTIONAL_ARGUMENT ],
   [ '--index', '-i', GetoptLong::OPTIONAL_ARGUMENT ],
   [ '--port', '-p', GetoptLong::OPTIONAL_ARGUMENT ],
   [ '--seconds', '-s', GetoptLong::OPTIONAL_ARGUMENT ]
@@ -26,6 +46,9 @@ opts = GetoptLong.new(
 
 opts.each do |opt, arg|
   case opt
+    when '--help'
+      print_help
+      exit!
     when '--host'
       args[:host] = arg
     when '--port'
