@@ -1,0 +1,110 @@
+#!/usr/bin/env ruby
+
+require 'rubygems'
+require 'net/http'
+require 'json'
+require 'uri'
+require 'getoptlong'
+require 'socket'
+
+check_result = -1
+
+def print_help 
+  puts(<<-EOT)
+  Usage:
+
+    Check to see if an elasticsearch index is being updated and send the results
+    to a prometheus push gateway
+
+  Help:
+    es_data_updating_check -h
+
+  Options:
+    --host      ElasticSearch node defaults to localhost
+    --port      ElasticSearch port defaults to 9200
+    --seconds   Number of seconds where an update must have occured
+    --index     The index to query
+    --prom      The prometheus server defaults to prometheus-server
+    --prom-port The prometheus server port defaults to 9091
+
+  EOT
+  
+end
+
+#set defaults
+args = {
+    :host        => 'localhost',
+    :port        => 9200,
+    :index       => '_all',
+    :seconds     => 120,
+    :prometheus  => 'prometheus-server',
+    :prom_port   => 9091,
+}
+
+opts = GetoptLong.new(
+  [ '--host'      , '-H' , GetoptLong::OPTIONAL_ARGUMENT ] ,
+  [ '--help'      , '-h' , GetoptLong::OPTIONAL_ARGUMENT ] ,
+  [ '--index'     , '-i' , GetoptLong::OPTIONAL_ARGUMENT ] ,
+  [ '--port'      , '-p' , GetoptLong::OPTIONAL_ARGUMENT ] ,
+  [ '--seconds'   , '-s' , GetoptLong::OPTIONAL_ARGUMENT ] ,
+  [ '--prom'      , '-P' , GetoptLong::OPTIONAL_ARGUMENT ] ,
+  [ '--prom-port' , '-q' , GetoptLong::OPTIONAL_ARGUMENT ] ,
+)
+
+opts.each do |opt, arg|
+  case opt
+    when '--help'
+      print_help
+      exit!
+    when '--host'
+      args[:host] = arg
+    when '--port'
+      args[:port] = arg.to_i
+    when '--seconds'
+      args[:seconds] = arg.to_i
+    when '--index'
+      args[:index] = arg
+    when '--prom'
+      args[:prometheus] = arg
+    when '--prom-port'
+      args[:prom_port] = arg
+  end
+end
+
+
+begin
+  uri = URI.parse("http://#{args[:host]}:#{args[:port]}/#{args[:index]}/_search")
+  payload={"query" => {"range" =>
+                      {"@timestamp"=>
+                        {"from"=>Time.at(Time.now.to_i-args[:seconds]).utc.strftime("%FT%TZ"),
+                          "to"=>Time.at(Time.now.to_i+args[:seconds]).utc.strftime("%FT%TZ")
+          }}}}
+  req = Net::HTTP::Post.new(uri.path, initheader = {'Content-Type' =>'application/json'})
+  req.body = payload.to_json
+  response = Net::HTTP.new(uri.host, uri.port).start {|http| http.request(req) }
+  if response.code == "200"
+    if JSON.parse(response.body)['hits']['total'] > 0
+      check_result = 1
+    else
+      check_result = -3
+    end
+  else 
+    check_result = -4
+  end
+rescue Exception
+  check_result = -2
+end
+
+uri = URI.parse("http://#{args[:prometheus]}:#{args[:prom_port].to_s}/metrics/job/nginx_status/instance/#{Socket.gethostname}")
+request = Net::HTTP::Post.new(uri)
+request.body = "es_updating #{check_result.to_i}"
+
+req_options = {
+  use_ssl: uri.scheme == "https",
+}
+
+response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
+  http.request(request)
+end
+
+p response.body
