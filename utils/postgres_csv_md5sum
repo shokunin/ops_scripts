@@ -1,0 +1,21 @@
+#!/usr/bin/env ruby
+
+require 'csv'
+require 'digest'
+
+all_shas = Hash.new(0)
+
+CSV.foreach(ARGV[0]) do |row|
+  if row[7] == "SELECT"
+    if row[13] =~ /.*statement:(.*)/
+      all_shas[Digest::SHA256.hexdigest($1)] += 1
+    end
+  end
+end
+
+
+all_shas.each do |k, v|
+  if v > 3
+    puts "#{v} #{k}"
+  end
+end
