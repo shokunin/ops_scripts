@@ -97,7 +97,7 @@ end
 
 uri = URI.parse("http://#{args[:prometheus]}:#{args[:prom_port].to_s}/metrics/job/nginx_status/instance/#{Socket.gethostname}")
 request = Net::HTTP::Post.new(uri)
-request.body = "es_updating #{check_result.to_i}"
+request.body = "es_updating #{check_result.to_i}\n"
 
 req_options = {
   use_ssl: uri.scheme == "https",
