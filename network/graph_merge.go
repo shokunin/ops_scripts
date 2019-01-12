@@ -30,7 +30,7 @@ func graphinit(hostame string, port int, keyname string) {
 	graph.Query(query)
 }
 
-func worker(id int, jobs <-chan int, results chan<- string, hostame string, port int, keyname string) {
+func worker(id int, jobs <-chan int, results chan<- string, hostame string, port int, keyname string, verbose bool) {
 	conn, _ := redis.Dial("tcp", fmt.Sprintf("%s:%d", hostname, port))
 	defer conn.Close()
 	graph := rg.Graph{}.New(keyname, conn)
@@ -38,7 +38,9 @@ func worker(id int, jobs <-chan int, results chan<- string, hostame string, port
 	for j := range jobs {
 		query := fmt.Sprintf("MERGE (e:Entry{EntryID: '%d'}) SET e.FirstName='Chris', e.LastName='Mague', e.Title='Troublemaker', e.Location='San Francisco'", j)
 		graph.Query(query)
-		fmt.Println(j)
+		if verbose && (j%10000) == 0 {
+			fmt.Println(j)
+		}
 		results <- "OK"
 	}
 }
@@ -48,6 +50,7 @@ var keyname string
 var port int
 var concurrent int
 var count int
+var verbose bool
 
 func init() {
 	flag.StringVar(&keyname, "keyname", "merge_test", "key name of the graphdb")
@@ -55,6 +58,7 @@ func init() {
 	flag.IntVar(&port, "port", 6379, "port to try to connect to")
 	flag.IntVar(&concurrent, "concurrent", 10, "number of workers to run")
 	flag.IntVar(&count, "count", 1000, "number of records")
+	flag.BoolVar(&verbose, "verbose", false, "print progress")
 	flag.Parse()
 }
 
@@ -69,7 +73,7 @@ func main() {
 	graphinit(hostname, port, keyname)
 
 	for w := 0; w < concurrent; w++ {
-		go worker(w, jobs, results, hostname, port, keyname)
+		go worker(w, jobs, results, hostname, port, keyname, verbose)
 	}
 
 	for j := 0; j <= count-1; j++ {
