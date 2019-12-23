@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/go-redis/redis"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/go-redis/redis"
 )
 
 type clusterNode struct {
@@ -18,7 +19,7 @@ type clusterNode struct {
 	slaves  []string
 }
 
-func list_masters(clusterNodes []clusterNode) []string {
+func listMasters(clusterNodes []clusterNode) []string {
 	var masters []string
 	for _, v := range clusterNodes {
 		if v.role == "master" {
@@ -28,7 +29,7 @@ func list_masters(clusterNodes []clusterNode) []string {
 	return masters
 }
 
-func parse_nodes(nodes *redis.StringCmd) []clusterNode {
+func parseNodes(nodes *redis.StringCmd) []clusterNode {
 	var clusterNodes []clusterNode
 	for _, line := range strings.Split(nodes.Val(), "\n") {
 		ln := strings.Split(line, " ")
@@ -67,14 +68,77 @@ func parse_nodes(nodes *redis.StringCmd) []clusterNode {
 	return clusterNodes
 }
 
+func getKeyspace(servers []string, password string) int {
+	keys := 0
+	for _, server := range servers {
+		client := redis.NewClient(&redis.Options{
+			Addr:     server,
+			Password: password, // no password set
+		})
+		info := client.Info("keyspace")
+		for _, line := range strings.Split(info.Val(), "\n") {
+			r := regexp.MustCompile(`db\d+:keys=(\d+),`)
+			res := r.FindStringSubmatch(line)
+			if len(res) > 0 {
+				j, _ := strconv.Atoi(res[1])
+				keys += j
+			}
+		}
+	}
+	return keys
+}
+
+func getMemory(servers []string, password string) int {
+	bytes := 0
+	for _, server := range servers {
+		client := redis.NewClient(&redis.Options{
+			Addr:     server,
+			Password: password, // no password set
+		})
+		info := client.Info("memory")
+		for _, line := range strings.Split(info.Val(), "\n") {
+			r := regexp.MustCompile(`used_memory:(\d+)`)
+			res := r.FindStringSubmatch(line)
+			if len(res) > 0 {
+				j, _ := strconv.Atoi(res[1])
+				bytes += j
+			}
+		}
+	}
+	return (bytes)
+}
+
+func getReplicationFactor(clusterNodes []clusterNode) int {
+	var repFactor []int
+	for _, v := range clusterNodes {
+		if v.role == "master" {
+			repFactor = append(repFactor, len(v.slaves))
+		}
+	}
+	return (sliceMax(repFactor))
+}
+
+func sliceMax(s []int) int {
+	m := 0
+	for i, e := range s {
+		if i == 0 || e > m {
+			m = e
+		}
+	}
+	return (m)
+}
+
 func main() {
 
 	rdb := redis.NewClusterClient(&redis.ClusterOptions{
 		Addrs: []string{":30001"},
 	})
 	j := rdb.ClusterNodes()
-	k := parse_nodes(j)
-	fmt.Println(list_masters(k))
+	k := parseNodes(j)
+	m := listMasters(k)
+	fmt.Println("master_count", len(m))
+	fmt.Println("replication_factor", getReplicationFactor(k))
+	fmt.Println("total_key_count", getKeyspace(m, ""))
+	fmt.Println("total_memory", getMemory(m, ""))
 	os.Exit(0)
-
 }
