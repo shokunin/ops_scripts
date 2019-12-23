@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-var clusterNodes []clusterNode
-
 type clusterNode struct {
 	id      string
 	ip      string
@@ -20,7 +18,18 @@ type clusterNode struct {
 	slaves  []string
 }
 
-func parse_nodes(nodes *redis.StringCmd) {
+func list_masters(clusterNodes []clusterNode) []string {
+	var masters []string
+	for _, v := range clusterNodes {
+		if v.role == "master" {
+			masters = append(masters, v.ip+":"+strconv.Itoa(v.port))
+		}
+	}
+	return masters
+}
+
+func parse_nodes(nodes *redis.StringCmd) []clusterNode {
+	var clusterNodes []clusterNode
 	for _, line := range strings.Split(nodes.Val(), "\n") {
 		ln := strings.Split(line, " ")
 		if len(ln) > 1 {
@@ -55,6 +64,7 @@ func parse_nodes(nodes *redis.StringCmd) {
 		}
 	}
 
+	return clusterNodes
 }
 
 func main() {
@@ -63,8 +73,8 @@ func main() {
 		Addrs: []string{":30001"},
 	})
 	j := rdb.ClusterNodes()
-	parse_nodes(j)
-	fmt.Println(clusterNodes)
+	k := parse_nodes(j)
+	fmt.Println(list_masters(k))
 	os.Exit(0)
 
 }
