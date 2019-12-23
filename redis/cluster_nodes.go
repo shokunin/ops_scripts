@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var clusterNodes []clusterNode
+
 type clusterNode struct {
 	id      string
 	ip      string
@@ -18,8 +20,7 @@ type clusterNode struct {
 	slaves  []string
 }
 
-func parse_nodes(nodes *redis.StringCmd) map[string]clusterNode {
-	clusterNodes := make(map[string]clusterNode)
+func parse_nodes(nodes *redis.StringCmd) {
 	for _, line := range strings.Split(nodes.Val(), "\n") {
 		ln := strings.Split(line, " ")
 		if len(ln) > 1 {
@@ -41,16 +42,18 @@ func parse_nodes(nodes *redis.StringCmd) map[string]clusterNode {
 				port:    i,
 				cmdport: j,
 			}
-			clusterNodes[ln[0]] = n
+			clusterNodes = append(clusterNodes, n)
 
 			if role == "slave" {
-				fmt.Println(ln[3])
-				clusterNodes[ln[3]].slaves = append(clusterNodes[ln[3]].slaves, ln[0])
+				for i, v := range clusterNodes {
+					if v.id == ln[3] {
+						clusterNodes[i].slaves = append(clusterNodes[i].slaves, ln[0])
+					}
+				}
 			}
 
 		}
 	}
-	return (clusterNodes)
 
 }
 
@@ -60,7 +63,8 @@ func main() {
 		Addrs: []string{":30001"},
 	})
 	j := rdb.ClusterNodes()
-	fmt.Println(parse_nodes(j))
+	parse_nodes(j)
+	fmt.Println(clusterNodes)
 	os.Exit(0)
 
 }
