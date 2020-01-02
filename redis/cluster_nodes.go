@@ -31,30 +31,45 @@ func listMasters(clusterNodes []clusterNode) []string {
 
 func parseNodes(nodes *redis.StringCmd) []clusterNode {
 	var clusterNodes []clusterNode
+	// the order is not set so we need to run through this loop twice first to get the masters
 	for _, line := range strings.Split(nodes.Val(), "\n") {
 		ln := strings.Split(line, " ")
 		if len(ln) > 1 {
-			role := "slave"
 			r := regexp.MustCompile(`(\S+):(\d+)@(\d+)`)
 			res := r.FindStringSubmatch(ln[1])
 			match, _ := regexp.MatchString("master", ln[2])
 			if match {
-				role = "master"
+				i, _ := strconv.Atoi(res[2])
+				j, _ := strconv.Atoi(res[3])
+				n := clusterNode{
+					id:      ln[0],
+					role:    "master",
+					ip:      res[1],
+					port:    i,
+					cmdport: j,
+				}
+				clusterNodes = append(clusterNodes, n)
 			}
+		}
+	}
+	for _, line := range strings.Split(nodes.Val(), "\n") {
+		ln := strings.Split(line, " ")
+		if len(ln) > 1 {
+			r := regexp.MustCompile(`(\S+):(\d+)@(\d+)`)
+			res := r.FindStringSubmatch(ln[1])
+			match, _ := regexp.MatchString("slave", ln[2])
 
-			i, _ := strconv.Atoi(res[2])
-			j, _ := strconv.Atoi(res[3])
-
-			n := clusterNode{
-				id:      ln[0],
-				role:    role,
-				ip:      res[1],
-				port:    i,
-				cmdport: j,
-			}
-			clusterNodes = append(clusterNodes, n)
-
-			if role == "slave" {
+			if match {
+				i, _ := strconv.Atoi(res[2])
+				j, _ := strconv.Atoi(res[3])
+				n := clusterNode{
+					id:      ln[0],
+					role:    "slave",
+					ip:      res[1],
+					port:    i,
+					cmdport: j,
+				}
+				clusterNodes = append(clusterNodes, n)
 				for i, v := range clusterNodes {
 					if v.id == ln[3] {
 						clusterNodes[i].slaves = append(clusterNodes[i].slaves, ln[0])
@@ -131,7 +146,7 @@ func sliceMax(s []int) int {
 func main() {
 
 	rdb := redis.NewClusterClient(&redis.ClusterOptions{
-		Addrs: []string{":30001"},
+		Addrs: []string{"localhost:30001"},
 	})
 	j := rdb.ClusterNodes()
 	k := parseNodes(j)
