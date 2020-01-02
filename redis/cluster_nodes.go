@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/go-redis/redis"
 )
@@ -52,6 +54,7 @@ func parseNodes(nodes *redis.StringCmd) []clusterNode {
 			}
 		}
 	}
+	// TODO: DRY this up
 	for _, line := range strings.Split(nodes.Val(), "\n") {
 		ln := strings.Split(line, " ")
 		if len(ln) > 1 {
@@ -123,6 +126,36 @@ func getMemory(servers []string, password string) int {
 	return (bytes)
 }
 
+func getCommands(server string, password string, iters int, slp int, results chan<- int, wg *sync.WaitGroup) {
+	defer wg.Done()
+	prev_commands := 0
+	max_commands := 0
+	client := redis.NewClient(&redis.Options{
+		Addr:     server,
+		Password: password, // no password set
+	})
+	for i := 1; i <= iters; i++ {
+		info := client.Info("stats")
+		for _, line := range strings.Split(info.Val(), "\n") {
+			r := regexp.MustCompile(`total_commands_processed:(\d+)`)
+			res := r.FindStringSubmatch(line)
+			if len(res) > 0 {
+				j, _ := strconv.Atoi(res[1])
+				if prev_commands > 0 {
+					if max_commands < j-prev_commands {
+						max_commands = j - prev_commands
+						prev_commands = j
+					}
+				} else {
+					prev_commands = j
+				}
+			}
+		}
+		time.Sleep(time.Duration(slp) * time.Second)
+	}
+	results <- max_commands / slp
+}
+
 func getReplicationFactor(clusterNodes []clusterNode) int {
 	var repFactor []int
 	for _, v := range clusterNodes {
@@ -145,6 +178,8 @@ func sliceMax(s []int) int {
 
 func main() {
 
+	var wg sync.WaitGroup
+
 	rdb := redis.NewClusterClient(&redis.ClusterOptions{
 		Addrs: []string{"localhost:30001"},
 	})
@@ -155,5 +190,17 @@ func main() {
 	fmt.Println("replication_factor", getReplicationFactor(k))
 	fmt.Println("total_key_count", getKeyspace(m, ""))
 	fmt.Println("total_memory", getMemory(m, ""))
+	wg.Add(len(m))
+	results := make(chan int, len(m))
+	for w := 0; w < len(m); w++ {
+		go getCommands(m[w], "", 5, 2, results, &wg)
+	}
+	wg.Wait()
+	close(results)
+	cmds := 0
+	for elem := range results {
+		cmds += elem
+	}
+	fmt.Println("max_commands", cmds)
 	os.Exit(0)
 }
