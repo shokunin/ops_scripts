@@ -44,7 +44,6 @@ func randomDialer() (net.Conn, error) {
 	})
 
 	n := rand.Int() % len(ips)
-	fmt.Println(ips[n])
 
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", ips[n], rPort))
 	return conn, err
