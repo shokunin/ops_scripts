@@ -1,13 +1,20 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
-	"github.com/go-redis/redis"
 	"math/rand"
+	"net"
 	"os"
+	"sort"
 	"time"
+
+	"github.com/go-redis/redis"
 )
+
+var rHost string
+var rPort int
 
 func errHndlr(err error) {
 	if err != nil {
@@ -17,14 +24,30 @@ func errHndlr(err error) {
 }
 
 func worker(id int, jobs <-chan int, results chan<- int, redisClient *redis.Client) {
-	n := rand.Intn(10)
-	time.Sleep(time.Duration(n) * time.Second)
 	for j := range jobs {
 		pong, err := redisClient.Ping().Result()
 		errHndlr(err)
 		fmt.Println(pong, ",", id)
 		results <- j
 	}
+}
+
+//func randomDialer(redisHost string, redisPort int) (net.Conn, error) {
+func randomDialer() (net.Conn, error) {
+	ips, reserr := net.LookupIP(rHost)
+	if reserr != nil {
+		return nil, reserr
+	}
+
+	sort.Slice(ips, func(i, j int) bool {
+		return bytes.Compare(ips[i], ips[j]) < 0
+	})
+
+	n := rand.Int() % len(ips)
+	fmt.Println(ips[n])
+
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", ips[n], rPort))
+	return conn, err
 }
 
 func main() {
@@ -34,9 +57,11 @@ func main() {
 	messageCount := flag.Int("message_count", 100000, "run this man times")
 	threadCount := flag.Int("threadcount", 10, "run this man threads")
 	flag.Parse()
+	rHost = *redisHost
+	rPort = *redisPort
 
 	client := redis.NewClient(&redis.Options{
-		Addr:            fmt.Sprintf("%s:%d", *redisHost, *redisPort),
+		Dialer:          randomDialer, // Randomly pick an IP address from the list of ips retruned
 		Password:        *redisPassword,
 		DB:              0,
 		MinIdleConns:    1,                    // make sure there are at least this many connections
