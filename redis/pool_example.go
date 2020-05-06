@@ -65,7 +65,7 @@ func main() {
 		DB:              0,
 		MinIdleConns:    1,                    // make sure there are at least this many connections
 		MinRetryBackoff: 8 * time.Millisecond, //minimum amount of time to try and backupf
-		MaxRetryBackoff: 512 * time.Millisecond,
+		MaxRetryBackoff: 5000 * time.Millisecond,
 		MaxConnAge:      0,  //3 * time.Second this will cause everyone to reconnect every 3 seconds - 0 is keep open forever
 		MaxRetries:      10, // retry 10 times : automatic reconnect if a proxy is killed
 		IdleTimeout:     time.Second,
