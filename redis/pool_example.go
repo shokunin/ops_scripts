@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -10,11 +11,12 @@ import (
 	"sort"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 )
 
 var rHost string
 var rPort int
+var ctx = context.Background()
 
 func errHndlr(err error) {
 	if err != nil {
@@ -24,16 +26,16 @@ func errHndlr(err error) {
 }
 
 func worker(id int, jobs <-chan int, results chan<- int, redisClient *redis.Client) {
+	defer redisClient.Close()
 	for j := range jobs {
-		pong, err := redisClient.Ping().Result()
+		pong, err := redisClient.Ping(ctx).Result()
 		errHndlr(err)
 		fmt.Println(pong, ",", id)
 		results <- j
 	}
 }
 
-//func randomDialer(redisHost string, redisPort int) (net.Conn, error) {
-func randomDialer() (net.Conn, error) {
+func randomDialer(context.Context, string, string) (net.Conn, error) {
 	ips, reserr := net.LookupIP(rHost)
 	if reserr != nil {
 		return nil, reserr
